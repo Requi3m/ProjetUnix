@@ -257,25 +257,31 @@ int main(int argc, char *argv[]) {
 
     pidCliente = safe_fork();
     if (pidCliente){
+        close(c.cliente_to_main[0]);
+         close(c.main_to_cliente[1]);
         processus_cliente(&c, article);
     }
     else {
         pidVendeur = safe_fork();
         if (pidVendeur){
+            close(c.vendeur_to_main[0]);
+            close(c.main_to_vendeur[1]);
             processus_vendeur(&c);
         }
         else {
             pidCaissiere = safe_fork();
             if(pidCaissiere){
+                close(c.caissiere_to_main[0]);
+                close(c.main_to_caissiere[1]);
                 processus_caissiere(&c);
             }
             else{
-                // close(pfdClienteWrite[0]);
-                // close(pfdClienteRead[1]);
-                // close(pfdVendeurWrite[0]);
-                // close(pfdVendeurRead[1]);
-                // close(pfdCaissiereWrite[0]);
-                // close(pfdCaissiereRead[1]);
+                    close(c.vendeur_to_main[1]);
+                    close(c.main_to_vendeur[0]);
+                    close(c.cliente_to_main[1]);
+                    close(c.main_to_cliente[0]);
+                    close(c.caissiere_to_main[1]);
+                    close(c.main_to_caissiere[0]);
                 processus_main(&c);
             }
         }
