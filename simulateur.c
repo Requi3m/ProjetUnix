@@ -279,6 +279,5 @@ int main(int argc, char *argv[]) {
                 processus_main(&c);
             }
         }
-
     }
 }
