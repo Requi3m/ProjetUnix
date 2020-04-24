@@ -15,6 +15,12 @@ struct Canaux
     int main_to_caissiere[2];
 };
 
+struct Sac
+{
+    char produit[100];
+    int prix; // en centime
+};
+
 
 const char* je_voudrais = "Je voudrais un/une ";
 const char* bonjour = "Bonjour !";
@@ -57,32 +63,32 @@ void safe_destock(char* nom_var, int* var_pt) {
     }
 }
 
-char* echange(char* action, int canal_parle[], int canal_ecoute[]) {
+char* echange(char* nom_parle, char* action, char* nom_ecoute, int canal_parle[], int canal_ecoute[]) {
     static char buffer[100];
 
     read(canal_parle[0], buffer, sizeof(buffer));
-    printf("%s : %s\n", action, buffer);
+    printf("%s %s à %s: %s\n", nom_parle, action, nom_ecoute, buffer);
     write(canal_ecoute[1], buffer, strlen(buffer) + 1);
 
     return buffer;
 }
 
-void processus_main(struct Canaux* c) {
+void processus_main(struct Canaux* c, char* cliente, char* vendeur, char* caissière) {
     char buffer[100];
     char *phrase, *produit;
     int bodyStock = 10, brassiereStock = 10, pyjamaStock = 10;
 
     // le vendeur dit bonjour à la cliente
-    echange("Vendeur dit à cliente", (*c).vendeur_to_main,(*c).main_to_cliente);
+    echange(vendeur, "dit", cliente, (*c).vendeur_to_main,(*c).main_to_cliente);
 
     // la cliente répond bonjour au vendeur
-    echange("Cliente dit à vendeur", (*c).cliente_to_main, (*c).main_to_vendeur);
+    echange(cliente, "dit", vendeur, (*c).cliente_to_main, (*c).main_to_vendeur);
 
     // le vendeur demande à la cliente ce qui lui ferait plaisir
-    echange("Vendeur dit à cliente", (*c).vendeur_to_main, (*c).main_to_cliente);
+    echange(vendeur, "dit", cliente, (*c).vendeur_to_main, (*c).main_to_cliente);
 
     // la cliente dit le nom de l'article
-    phrase = echange("Cliente dit à vendeur", (*c).cliente_to_main, (*c).main_to_vendeur);
+    phrase = echange(cliente, "dit", vendeur, (*c).cliente_to_main, (*c).main_to_vendeur);
     produit = phrase + strlen(je_voudrais);
 
     // verifier que le stock n'est pas epuise et le mettre a jour
@@ -97,26 +103,26 @@ void processus_main(struct Canaux* c) {
     }
 
     // le vendeur tend l'article à la cliente
-    echange("Vendeur donne à cliente", (*c).vendeur_to_main, (*c).main_to_cliente);
+    echange(vendeur, "donne", cliente, (*c).vendeur_to_main, (*c).main_to_cliente);
 
 
     // la cliente tend l'article à la caissière
-    echange("Cliente donne à caissière", (*c).cliente_to_main, (*c).main_to_caissiere);
+    echange(cliente, "donne", caissière, (*c).cliente_to_main, (*c).main_to_caissiere);
 
     // la caissière annonce le total à payer à la cliente
-    echange("Caissière dit à cliente", (*c).caissiere_to_main, (*c).main_to_cliente);
+    echange(caissière, "dit" ,cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
 
     // la cliente paie à la caissière
-    echange("Cliente paye à caissière", (*c).cliente_to_main, (*c).main_to_caissiere);
+    echange(cliente, "paye" ,caissière, (*c).cliente_to_main, (*c).main_to_caissiere);
 
     // la caissière remet l'article et le ticket de caisse à la cliente, dans un sac
-    echange("Caissière donne à cliente", (*c).caissiere_to_main, (*c).main_to_cliente);
+    echange(caissière, "donne" ,cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
 
     // la cliente dit merci et au revoir à la caissière
-    echange("Cliente dit à caissière", (*c).cliente_to_main, (*c).main_to_caissiere);
+    echange(cliente, "dit", caissière, (*c).cliente_to_main, (*c).main_to_caissiere);
 
     // la caissière dit merci et au revoir à la cliente
-    echange("Caissière dit à cliente", (*c).caissiere_to_main, (*c).main_to_cliente);
+    echange(caissière, "dit", cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
 }
 
 
@@ -282,7 +288,7 @@ int main(int argc, char *argv[]) {
                     close(c.main_to_cliente[0]);
                     close(c.caissiere_to_main[1]);
                     close(c.main_to_caissiere[0]);
-                processus_main(&c);
+                processus_main(&c, cliente, vendeur, caissiere);
             }
         }
     }
