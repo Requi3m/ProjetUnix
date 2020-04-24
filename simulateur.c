@@ -18,7 +18,7 @@ struct Canaux
 struct Sac
 {
     char produit[100];
-    int prix; // en centime
+    int montant_ticket; // en euros, sans centimes
 };
 
 
@@ -65,12 +65,33 @@ void safe_destock(char* nom_var, int* var_pt) {
 
 char* echange(char* nom_parle, char* action, char* nom_ecoute, int canal_parle[], int canal_ecoute[]) {
     static char buffer[100];
+    int len;
 
-    read(canal_parle[0], buffer, sizeof(buffer));
+    len = read(canal_parle[0], buffer, sizeof(buffer));
     printf("%s %s à %s: %s\n", nom_parle, action, nom_ecoute, buffer);
-    write(canal_ecoute[1], buffer, strlen(buffer) + 1);
+    write(canal_ecoute[1], buffer, len);
 
     return buffer;
+}
+
+
+void echange_sac(char* nom_parle, char* nom_ecoute, int canal_parle[], int canal_ecoute[]) {
+    struct Sac sac;
+    int len;
+
+    len = read(canal_parle[0], &sac, sizeof(sac));
+    printf("%s donne un sac à %s contenant l'article %s et un ticket de montant %i.\n",
+            nom_parle, nom_ecoute, sac.produit, sac.montant_ticket);
+    write(canal_ecoute[1], &sac, len);
+}
+
+void echange_argent(char* nom_parle, char* nom_ecoute, int canal_parle[], int canal_ecoute[]) {
+    int argent;
+    int len;
+
+    len = read(canal_parle[0], &argent, sizeof(argent));
+    printf("%s paye %i euros à %s.\n", nom_parle, argent, nom_ecoute);
+    write(canal_ecoute[1], &argent, len);
 }
 
 void processus_main(struct Canaux* c, char* cliente, char* vendeur, char* caissière) {
@@ -113,10 +134,10 @@ void processus_main(struct Canaux* c, char* cliente, char* vendeur, char* caissi
     echange(caissière, "dit" ,cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
 
     // la cliente paie à la caissière
-    echange(cliente, "paye" ,caissière, (*c).cliente_to_main, (*c).main_to_caissiere);
+    echange_argent(cliente, caissière, (*c).cliente_to_main, (*c).main_to_caissiere);
 
     // la caissière remet l'article et le ticket de caisse à la cliente, dans un sac
-    echange(caissière, "donne" ,cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
+    echange_sac(caissière, cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
 
     // la cliente dit merci et au revoir à la caissière
     echange(cliente, "dit", caissière, (*c).cliente_to_main, (*c).main_to_caissiere);
@@ -154,7 +175,8 @@ void processus_cliente(struct Canaux* c, char* article) {
     char buffer[100];
     char produit[100];
     char prix[100];
-    char sac[100];
+    int argent;
+    struct Sac sac;
 
     // le vendeur dit bonjour à la cliente
     read((*c).main_to_cliente[0], buffer, sizeof(buffer));
@@ -181,10 +203,11 @@ void processus_cliente(struct Canaux* c, char* article) {
     read((*c).main_to_cliente[0], prix, sizeof(prix));
 
     // la cliente paie à la caissière
-    write((*c).cliente_to_main[1], prix, strlen(prix) + 1);
+    argent = atoi(prix);
+    write((*c).cliente_to_main[1], &argent, sizeof(argent));
 
     // la caissière remet l'article et le ticket de caisse à la cliente, dans un sac
-    read((*c).main_to_cliente[0], sac, sizeof(sac));
+    read((*c).main_to_cliente[0], &sac, sizeof(sac));
 
     // la cliente dit merci et au revoir à la caissière
     write((*c).cliente_to_main[1], merci, strlen(merci) + 1);
@@ -198,10 +221,9 @@ void processus_caissiere(struct Canaux* c) {
     char buffer[100];
     char produit[100];
     char prix[100];
-    char sac[100];
-    char argent[100];
+    int argent;
     int prix_provisoire;
-
+    struct Sac sac;
 
     // la cliente tend l'article à la caissière
     read((*c).main_to_caissiere[0], produit, sizeof(produit));
@@ -214,13 +236,15 @@ void processus_caissiere(struct Canaux* c) {
     write((*c).caissiere_to_main[1], prix, strlen(prix) + 1);
 
     // la cliente paie à la caissière
-    read((*c).main_to_caissiere[0], argent, sizeof(argent));
+    read((*c).main_to_caissiere[0], &argent, sizeof(argent));
 
     // check bonne somme
 
     // la caissière remet l'article et le ticket de caisse à la cliente, dans un sac
-    sprintf(sac, "un sac contenant un/une %s et un ticket de caisse d'un montant de %s", produit, prix);
-    write((*c).caissiere_to_main[1], sac, strlen(sac) + 1);
+    sac.montant_ticket = prix_provisoire;
+    strcpy(sac.produit, produit);
+
+    write((*c).caissiere_to_main[1], &sac, sizeof(sac));
 
     // la cliente dit merci et au revoir à la caissière
     read((*c).main_to_caissiere[0], buffer, sizeof(buffer));
