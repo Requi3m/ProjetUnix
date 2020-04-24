@@ -120,20 +120,31 @@ int main(int argc, char *argv[]){
 	// recevoir la reponse du vendeur
 	nb = read(pfdVendeurRead[0], buffer, sizeof(buffer));
 	printf("%s", buffer);
-	// la cliente recoit l'article
+	// donner l'article a la cliente
 	write(pfdClienteWrite[1], buffer, strlen(buffer)+1);
+	// recevoir l'article que la cliente tend
+	nb = read(pfdClienteRead[0], buffer, sizeof(buffer));
+	printf("%s", buffer);
+	// envoyer cet article a la classiere
+	write(pfdCaissiereWrite[1], buffer, strlen(buffer)+1);
       }
       else{
 	// LA CAISSIERE
 	close(pfdCaissiereWrite[1]);
 	close(pfdCaissiereRead[0]);
 	// close aussi les pipes cliente et vendeur ??
+
+	// recevoir l'article tendu par la cliente
+	nb = read(pfdCaissiereWrite[0], buffer, strlen(buffer)+1);
+	// doucher l'article
+	char *articleName = strchr(buffer, '/') + 5;
       }
     }
     else{
       // LE VENDEUR
       close(pfdVendeurWrite[1]);
       close(pfdVendeurRead[0]);
+      
       // dire Bonjour a la cliente
       char *chaine = vendeur;
       strcat(chaine, " : Bonjour");
