@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <string.h>
+#include <signal.h>
 
 
 struct Canaux
@@ -22,6 +23,8 @@ struct Sac
 };
 
 
+pid_t pidCliente, pidVendeur, pidCaissiere;
+
 const char* je_voudrais = "Je voudrais un/une ";
 const char* bonjour = "Bonjour !";
 const char* tu_veux_quoi = "Qu'est ce qui vous ferait plaisir ?";
@@ -31,6 +34,8 @@ const char* dommage = "Quel dommage, au revoir.";
 const char* rupture_stock = "Je suis désolé, nous sommes en rupture de stock de ";
 const char* trop_cher = "Oh ! Je n'ai pas assez d'argent. Je reviendrais.";
 
+const int NORMAL = 1, RUPTURE = 2, TROPCHER = 3;
+
 int safe_fork() {
     int f = fork();
     if (f == -1) {
@@ -38,6 +43,12 @@ int safe_fork() {
         exit(1);
     }
     return f;
+}
+
+void kill_all(int sig) {
+    kill(pidCliente, sig);
+    kill(pidVendeur, sig);
+    kill(pidCaissiere, sig);
 }
 
 void get_param(char* nom_var, char* val_var, char* dom0, char* dom1, char* dom2) {
@@ -118,7 +129,8 @@ void echange_argent(char* nom_parle, char* nom_ecoute, int canal_parle[], int ca
 
 void processus_main(struct Canaux* c, char* cliente, char* vendeur, char* caissière, int scenario) {
     char buffer[100];
-    char *phrase, *produit;
+    char *phrase, *produit, *prix;
+    int len;
     int bodyStock = 10, brassiereStock = 10, pyjamaStock = 10;
 
     // le vendeur dit bonjour à la cliente
@@ -134,7 +146,7 @@ void processus_main(struct Canaux* c, char* cliente, char* vendeur, char* caissi
     phrase = echange(cliente, "dit", vendeur, (*c).cliente_to_main, (*c).main_to_vendeur);
     produit = phrase + strlen(je_voudrais);
 
-    if (scenario == 2) { // scénario rupture de stock
+    if (scenario == RUPTURE) { // scénario rupture de stock
         // le vendeur annonce une rupture de stock
         echange(vendeur, "dit", cliente, (*c).vendeur_to_main, (*c).main_to_cliente);
 
@@ -165,10 +177,17 @@ void processus_main(struct Canaux* c, char* cliente, char* vendeur, char* caissi
     // la cliente tend l'article à la caissière
     echange(cliente, "donne", caissière, (*c).cliente_to_main, (*c).main_to_caissiere);
 
+    // la caissière cherche le prix du produit
+    len = read((*c).caissiere_to_main[0], buffer, sizeof(buffer));
+    printf("%s douche l'article.", caissière);
+    sprintf(prix, "%i", len);
+    write((*c).main_to_caissiere[1], prix, strlen(prix) + 1);
+
+
     // la caissière annonce le total à payer à la cliente
     echange(caissière, "dit" ,cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
 
-    if (scenario == 3) { // scénario crise économique
+    if (scenario == TROPCHER) { // scénario crise économique
         // la cliente n'a pas assez d'argent
         echange(cliente, "dit", caissière, (*c).cliente_to_main, (*c).main_to_caissiere);
 
@@ -215,7 +234,7 @@ void processus_vendeur(struct Canaux* c, int scenario) {
     read((*c).main_to_vendeur[0], phrase, sizeof(phrase));
     produit = phrase + strlen(je_voudrais);
 
-    if (scenario == 2) { // scénario rupture de stock
+    if (scenario == RUPTURE) { // scénario rupture de stock
         // le vendeur annonce une rupture de stock
         sprintf(buffer, "%s%s. Revenez une prochaine fois.", rupture_stock, produit);
         write((*c).vendeur_to_main[1], buffer, strlen(buffer) + 1);
@@ -254,7 +273,7 @@ void processus_cliente(struct Canaux* c, char* article, int scenario) {
     sprintf(buffer, "%s%s", je_voudrais, article);
     write((*c).cliente_to_main[1], buffer, strlen(buffer) + 1);
 
-    if (scenario == 2) { // scénario rupture de stock
+    if (scenario == RUPTURE) { // scénario rupture de stock
         // le vendeur annonce une rupture de stock
         read((*c).main_to_cliente[0], buffer, sizeof(buffer));
 
@@ -278,7 +297,7 @@ void processus_cliente(struct Canaux* c, char* article, int scenario) {
     // la caissière annonce le total à payer à la cliente
     read((*c).main_to_cliente[0], prix, sizeof(prix));
 
-    if (scenario == 3) { // scénario crise économique
+    if (scenario == TROPCHER) { // scénario crise économique
         // la cliente n'a pas assez d'argent
         write((*c).cliente_to_main[1], trop_cher, strlen(trop_cher) + 1);
 
@@ -310,25 +329,28 @@ void processus_caissiere(struct Canaux* c, int scenario) {
     char buffer[100];
     char produit[100];
     char prix[100];
+    int len;
     int argent;
-    int prix_provisoire;
     struct Sac sac;
 
-    if (scenario == 2) {
+    if (scenario == RUPTURE) {
         return;
     }
 
+    printf("La caissière débute sa journées");
     // la cliente tend l'article à la caissière
-    read((*c).main_to_caissiere[0], produit, sizeof(produit));
+    len = read((*c).main_to_caissiere[0], produit, sizeof(produit));
+    printf("Je cherche le prix de %s", produit);
 
-    // la caissière douche l'article
-    prix_provisoire = strlen(produit);
+    // la caissière douche l'article (cherche le prix de l'article)
+    write((*c).caissiere_to_main[1], produit, len);
+    len = read((*c).main_to_caissiere[0], prix, sizeof(prix));
+    printf("prix %s", prix);
 
     // la caissière annonce le total à payer à la cliente
-    sprintf(prix, "%i euros s'il-vous-plaît.", prix_provisoire);
-    write((*c).caissiere_to_main[1], prix, strlen(prix) + 1);
+    write((*c).caissiere_to_main[1], prix, len);
 
-    if (scenario == 3) { // scénario crise économique
+    if (scenario == TROPCHER) { // scénario crise économique
         // la cliente n'a pas assez d'argent
         read((*c).main_to_caissiere[0], buffer, sizeof(buffer));
 
@@ -341,14 +363,13 @@ void processus_caissiere(struct Canaux* c, int scenario) {
         return;
     }
 
-
     // la cliente paie à la caissière
     read((*c).main_to_caissiere[0], &argent, sizeof(argent));
 
     // check bonne somme
 
     // la caissière remet l'article et le ticket de caisse à la cliente, dans un sac
-    sac.montant_ticket = prix_provisoire;
+    sac.montant_ticket = argent;
     strcpy(sac.produit, produit);
 
     write((*c).caissiere_to_main[1], &sac, sizeof(sac));
@@ -383,43 +404,44 @@ int main(int argc, char *argv[]) {
 
     scenario = choix_scenario();
 
-    pid_t pidCliente, pidVendeur, pidCaissiere;
+    signal(SIGKILL, kill_all);
+
 
     pipe(c.cliente_to_main);
     pipe(c.main_to_cliente);
     pidCliente = safe_fork();
     if (pidCliente){
-        close(c.cliente_to_main[0]);
-        close(c.main_to_cliente[1]);
+        // close(c.cliente_to_main[0]);
+        // close(c.main_to_cliente[1]);
         processus_cliente(&c, article, scenario);
     }
     else {
-        close(c.cliente_to_main[1]);
-        close(c.main_to_cliente[0]);
+        // close(c.cliente_to_main[1]);
+        // close(c.main_to_cliente[0]);
 
         pipe(c.vendeur_to_main);
         pipe(c.main_to_vendeur);
         pidVendeur = safe_fork();
         if (pidVendeur){
-            close(c.vendeur_to_main[0]);
-            close(c.main_to_vendeur[1]);
+            // close(c.vendeur_to_main[0]);
+            // close(c.main_to_vendeur[1]);
             processus_vendeur(&c, scenario);
         }
         else {
-            close(c.vendeur_to_main[1]);
-            close(c.main_to_vendeur[0]);
+            // close(c.vendeur_to_main[1]);
+            // close(c.main_to_vendeur[0]);
 
             pipe(c.caissiere_to_main);
             pipe(c.main_to_caissiere);
             pidCaissiere = safe_fork();
             if(pidCaissiere){
-                close(c.caissiere_to_main[0]);
-                close(c.main_to_caissiere[1]);
+                // close(c.caissiere_to_main[0]);
+                // close(c.main_to_caissiere[1]);
                 processus_caissiere(&c, scenario);
             }
             else{
-                close(c.caissiere_to_main[1]);
-                close(c.main_to_caissiere[0]);
+                // close(c.caissiere_to_main[1]);
+                // close(c.main_to_caissiere[0]);
                 processus_main(&c, cliente, vendeur, caissiere, scenario);
             }
         }
