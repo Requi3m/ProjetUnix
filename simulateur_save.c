@@ -60,53 +60,81 @@ void get_param(char* nom_var, char* val_var, char* dom0, char* dom1, char* dom2)
     }
 }
 
+int inputIsInt(char *input){
+  int tmp=atoi(input);
+  int len=strlen(input);
+  char *check = malloc(len * sizeof(char));
+  sprintf(check, "%d", tmp);
+  return(strcmp(input, check) == 0 ? 1 : 0);
+}
+
 void choix_scenario(int *prixArticle, int *argentCliente, int *stockArticle){
-    printf("Nous vous proposons trois scenarios possibles.\n");
-    printf("Si vous desirez le scenario 'Dans le meilleur des mondes', tapez 1.\n");
-    printf("Si vous voulez le scenario 'Penurie de guerre', tapez 2.\n");
-    printf("Si vous desirez le scenario 'Crise des subprimes', tapez 3.\n");
-    printf("Si vous preferez choisir l'argent de la cliente et le prix de l'article, tapez 4.\n");
-    printf("Si vous voulez que le gosse du voisin se taise, tapez le !\n\nOption : ");
-    char ans;
-    int wrongAns = 0;
-    do{
-      scanf("%c", &ans);
-      switch(ans)
-	{
-	case '1':
-	  *prixArticle = 15;
-	  *argentCliente = 20;
-	  *stockArticle = 6;
+  printf("Nous vous proposons trois scenarios possibles.\n");
+  printf("Si vous desirez le scenario 'Dans le meilleur des mondes', tapez 1.\n");
+  printf("Si vous voulez le scenario 'Penurie de guerre', tapez 2.\n");
+  printf("Si vous desirez le scenario 'Crise des subprimes', tapez 3.\n");
+  printf("Si vous preferez choisir l'argent de la cliente et le prix de l'article, tapez 4.\n");
+  printf("Si vous voulez que le gosse du voisin se taise, tapez le !\n\nOption : ");
+  int ans;
+  while(1){
+    scanf("%d", &ans);
+    if(ans == 1 || ans == 2 || ans == 3 || ans == 4)
+      break;
+    printf("\nOption non reconnue. Tapez un entier entre 1 et 4 : ");
+  }
+  switch(ans)
+    {
+    case 1:
+      *prixArticle = 15;
+      *argentCliente = 20;
+      *stockArticle = 6;
+      break;
+      
+    case 2:
+      *prixArticle = 15;
+      *argentCliente = 20;
+      *stockArticle = 0;
+      break;
+      
+    case 3:
+      *prixArticle = 15;
+      *argentCliente = 10;
+      *stockArticle = 6;
+      break;
+      
+    case 4:
+      while(1){
+	printf("\nEntrez l'argent de la cliente (entier attendu) : ");
+	char strTemp[1024];
+	scanf("%s", strTemp);
+	if(inputIsInt(strTemp)) {
+	  *argentCliente=atoi(strTemp);
 	  break;
-	  
-	case '2':
-	  *prixArticle = 15;
-	  *argentCliente = 20;
-	  *stockArticle = 0;
-	  break;
-	  
-	case '3':
-	  *prixArticle = 15;
-	  *argentCliente = 10;
-	  *stockArticle = 6;
-	  break;
-	  
-	case '4':
-	  do
-	    printf("\nEntrez l'argent de la cliente (entier attendu) : ");
-	  while(scanf("%d", argentCliente) == 0);
-	  do
-	    printf("\nEntrez le prix de l'article (entier attendu) : ");
-	  while(scanf("%d", prixArticle) == 0);
-	  do
-	    printf("\nEntrez le nombre d'articles en stock (entier attendu) : ");
-	  while(scanf("%d", stockArticle));
-	  break;
-	  
-	default:
-	  wrongAns=1;
 	}
-    } while(wrongAns);
+	printf("\n%s n'est pas un entier. Reessayez !", strTemp);
+      }
+      while(1){
+	printf("\nEntrez le prix de l'article (entier attendu) : ");
+	char strTemp[1024];
+	scanf("%s", strTemp);
+	if(inputIsInt(strTemp)) {
+	  *prixArticle=atoi(strTemp);
+	  break;
+	}
+	printf("\n%s n'est pas un entier. Reessayez !", strTemp);
+      }
+      while(1){
+	printf("\nEntrez le nombre d'articles en stock (entier attendu) : ");
+	char strTemp[1024];
+	scanf("%s", strTemp);
+	if(inputIsInt(strTemp)) {
+	  *stockArticle=atoi(strTemp);
+	  printf("\n");
+	  break;
+	}
+	printf("%\ns n'est pas un entier. Reessayez !", strTemp);
+      }
+    }
 }
 
 
@@ -151,20 +179,22 @@ void echange_sac(char* nom_parle, char* nom_ecoute, int canal_parle[], int canal
 void echange_argent(char* nom_parle, char* nom_ecoute, int canal_parle[], int canal_ecoute[]) {
     int argent;
     int len;
+    char argentStr[100];
 
-    len = read(canal_parle[0], &argent, sizeof(argent));
+    len = read(canal_parle[0], argentStr, sizeof(argentStr));
+    argent = atoi(argentStr);
     printf("%s paye %i euros a %s.\n", nom_parle, argent, nom_ecoute);
-    write(canal_ecoute[1], &argent, len);
+    write(canal_ecoute[1], argentStr, len);
 }
 
 void processus_main(struct Canaux* c, char* cliente, char* vendeur, char* caissiere,
 		    int prixArticle, int stockArticle, int argentCliente) {
     char buffer[100];
-    char *phrase, *produit, prix[5];
+    char *phrase, *produit, prix[100];
     sprintf(prix, "%d", prixArticle);
     int bodyStock = stockArticle, brassiereStock = stockArticle, pyjamaStock = stockArticle;
 
-    // le vendeur dit bonjour à la cliente
+    // le vendeur dit bonjour a la cliente
     echange(vendeur, "dit", cliente, (*c).vendeur_to_main,(*c).main_to_cliente);
 
     // la cliente repond bonjour au vendeur
@@ -210,12 +240,11 @@ void processus_main(struct Canaux* c, char* cliente, char* vendeur, char* caissi
 
     // la caissiere cherche le prix du produit
     read((*c).caissiere_to_main[0], buffer, sizeof(buffer));
-    sprintf(prix, "%li", strlen(buffer));
+    if(strcmp(buffer, "body") == 0){}
     write((*c).main_to_caissiere[1], prix, strlen(prix) + 1);
 
-
     // la caissiere annonce le total a payer a la cliente
-    echange(caissiere, "dit" ,cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
+    echange(caissiere, "dit" , cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
 
     if (argentCliente < prixArticle) { // scenario crise economique
         // la cliente n'a pas assez d'argent
@@ -230,7 +259,6 @@ void processus_main(struct Canaux* c, char* cliente, char* vendeur, char* caissi
         // fin de la simulation
         exit(0);
     }
-
     // la cliente paie a la caissiere
     echange_argent(cliente, caissiere, (*c).cliente_to_main, (*c).main_to_caissiere);
 
@@ -265,7 +293,7 @@ void processus_vendeur(struct Canaux* c, int stockArticle) {
 
     if (stockArticle == 0) { // scenario rupture de stock
         // le vendeur annonce une rupture de stock
-        sprintf(buffer, "%s%s. Revenez une prochaine fois.", rupture_stock, produit);
+        sprintf(buffer, "%s%s. \nRevenez une prochaine fois.", rupture_stock, produit);
         write((*c).vendeur_to_main[1], buffer, strlen(buffer) + 1);
 
         // la cliente est desolee et dit au revoir
@@ -314,14 +342,14 @@ void processus_cliente(struct Canaux* c, char* article, int *argentCliente) {
 
         return;
     }
-    // le vendeur tend l'article à la cliente
+    // le vendeur tend l'article a la cliente
 
     // check que produit == article
 
     // la cliente tend l'article a la caissiere
     write((*c).cliente_to_main[1], produit, strlen(produit) + 1);
 
-    // la caissiere annonce le total a payer à la cliente
+    // la caissiere annonce le total a payer a la cliente
     read((*c).main_to_cliente[0], prix, sizeof(prix));
 
     argentToPay = atoi(prix);
@@ -341,9 +369,11 @@ void processus_cliente(struct Canaux* c, char* article, int *argentCliente) {
 
     // la cliente paie a la caissiere
     *argentCliente = *argentCliente - argentToPay;
-    char argentStr[5];
-    sprintf(argentStr, "%d", *argentCliente);
-    write((*c).cliente_to_main[1], argentStr, sizeof(argentToPay));
+    
+    char prixStr[100];
+    sprintf(prixStr, "%d", argentToPay);
+    
+    write((*c).cliente_to_main[1], prixStr, sizeof(prixStr));
 
     // la caissiere remet l'article et le ticket de caisse a la cliente, dans un sac
     read((*c).main_to_cliente[0], &sac, sizeof(sac));
@@ -373,7 +403,6 @@ void processus_caissiere(struct Canaux* c, int stockArticle) {
     // la caissiere douche l'article (cherche le prix de l'article)
     write((*c).caissiere_to_main[1], produit, len);
     len = read((*c).main_to_caissiere[0], prix, sizeof(prix));
-    printf("prix %s", prix);
 
     // la caissiere annonce le total a payer a la cliente
     char prixToPay[150];
@@ -386,7 +415,6 @@ void processus_caissiere(struct Canaux* c, int stockArticle) {
     
     if (strstr(buffer, "pas assez d'argent") != NULL) { // scenario crise economique
         // la cliente n'a pas assez d'argent
-        read((*c).main_to_caissiere[0], buffer, sizeof(buffer));
 
         // la caissiere est desolee et dit au revoir
         write((*c).caissiere_to_main[1], dommage, strlen(dommage) + 1);
@@ -398,6 +426,7 @@ void processus_caissiere(struct Canaux* c, int stockArticle) {
     }
 
     // la cliente paie a la caissiere
+
     argent = atoi(buffer);
 
     // check bonne somme
@@ -405,7 +434,6 @@ void processus_caissiere(struct Canaux* c, int stockArticle) {
     // la caissiere remet l'article et le ticket de caisse a la cliente, dans un sac
     sac.montant_ticket = argent;
     strcpy(sac.produit, produit);
-
     write((*c).caissiere_to_main[1], &sac, sizeof(sac));
 
     // la cliente dit merci et au revoir a la caissiere
@@ -435,7 +463,7 @@ int main(int argc, char *argv[]) {
     get_param("caissiere", caissiere, "Lilou", "Laura", "Nadia");
     get_param("article", article, "body", "brassiere", "pyjama");
 
-    choix_scenario(&argentCliente, &prixArticle, &stockArticle);
+    choix_scenario(&prixArticle, &argentCliente, &stockArticle);
 
     pipe(c.cliente_to_main);
     pipe(c.main_to_cliente);
@@ -474,7 +502,6 @@ int main(int argc, char *argv[]) {
 	      close(c.caissiere_to_main[1]);
 	      close(c.main_to_caissiere[0]);
 	      signal(SIGKILL, kill_all);
-	      
 	      processus_main(&c, cliente, vendeur, caissiere, prixArticle, stockArticle, argentCliente);
             }
         }
