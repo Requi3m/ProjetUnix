@@ -26,6 +26,8 @@ const char* je_voudrais = "Je voudrais un/une ";
 const char* bonjour = "Bonjour !";
 const char* tu_veux_quoi = "Qu'est ce qui vous ferait plaisir ?";
 const char* merci = "Merci et au revoir !";
+const char* bienvenue = "Bienvenue à DauDau Bébé, la boutique de vêtements pour vos filous.";
+
 
 int safe_fork() {
     int f = fork();
@@ -36,17 +38,14 @@ int safe_fork() {
     return f;
 }
 
-void check_param_domain(char* nom_var, char* val_var, char* dom0, char* dom1, char* dom2) {
-    if (strcmp(val_var, dom0) && strcmp(val_var, dom1) && strcmp(val_var, dom2)){
-        char buf[1024];
-
-        sprintf(buf, "Erreur, le premier argument doit etre le nom de la %s :\n%s, %s ou %s."
-            "\nAttention a l'ordre des arguments !\n", nom_var, dom0, dom1, dom2);
-        perror(buf);
-        exit(1);
+void get_param(char* nom_var, char* val_var, char* dom0, char* dom1, char* dom2) {
+    printf("Choisissez un.e %s entre %s, %s ou %s.\n", nom_var, dom0, dom1, dom2);
+    scanf("%s", val_var);
+    while (strcmp(val_var, dom0) && strcmp(val_var, dom1) && strcmp(val_var, dom2)) {
+        printf("Nom de %s incorrect. Les personnes disponibles sont %s, %s et %s.\n", nom_var, dom0, dom1, dom2);
+        scanf("%s", val_var);
     }
 }
-
 
 void safe_destock(char* nom_var, int* var_pt) {
     // verifier que le stock n'est pas epuise et le mettre a jour
@@ -62,6 +61,7 @@ void safe_destock(char* nom_var, int* var_pt) {
         (*var_pt)--;
     }
 }
+
 
 char* echange(char* nom_parle, char* action, char* nom_ecoute, int canal_parle[], int canal_ecoute[]) {
     static char buffer[100];
@@ -257,34 +257,29 @@ void processus_caissiere(struct Canaux* c) {
 
 int main(int argc, char *argv[]) {
     struct Canaux c;
-
+    char cliente[100];
+    char vendeur[100];
+    char caissiere[100];
+    char article[100];
+    char buffer[100];
     int nb;
-    char *buffer[100];
 
-    if (argc != 5){
-        perror("Erreur, nombre incorrect d'argument. Quatre arguments sont attendus : le nom de la cliente, le nom du vendeur, le nom de la caissiere et le nom du produit.\n");
+    if (argc != 1) {
+        perror("Erreur, pas d'arguments attendus.\n");
         exit(1);
     }
-    char *cliente = argv[1];
-    char *vendeur = argv[2];
-    char *caissiere = argv[3];
-    char *article = argv[4];
 
+    printf("%s\n", bienvenue);
+    get_param("cliente", cliente, "Chloe", "Elise", "Lea");
+    get_param("vendeur", vendeur, "Pierre", "Paul", "Jacques");
+    get_param("caissiere", caissiere, "Lilou", "Laura", "Nadia");
+    get_param("article", article, "body", "brassiere", "pyjama");
 
-    check_param_domain("cliente", cliente, "Chloe", "Elise", "Lea");
-    check_param_domain("vendeur", vendeur, "Pierre", "Paul", "Jacques");
-    check_param_domain("caissiere", caissiere, "Lilou", "Laura", "Nadia");
-    check_param_domain("article", article, "body", "brassiere", "pyjama");
-
-    pipe(c.vendeur_to_main);
-    pipe(c.main_to_vendeur);
-    pipe(c.cliente_to_main);
-    pipe(c.main_to_cliente);
-    pipe(c.caissiere_to_main);
-    pipe(c.main_to_caissiere);
 
     pid_t pidCliente, pidVendeur, pidCaissiere;
 
+    pipe(c.cliente_to_main);
+    pipe(c.main_to_cliente);
     pidCliente = safe_fork();
     if (pidCliente){
         close(c.cliente_to_main[0]);
@@ -292,6 +287,8 @@ int main(int argc, char *argv[]) {
         processus_cliente(&c, article);
     }
     else {
+        pipe(c.vendeur_to_main);
+        pipe(c.main_to_vendeur);
         pidVendeur = safe_fork();
         if (pidVendeur){
             close(c.vendeur_to_main[0]);
@@ -299,6 +296,8 @@ int main(int argc, char *argv[]) {
             processus_vendeur(&c);
         }
         else {
+            pipe(c.caissiere_to_main);
+            pipe(c.main_to_caissiere);
             pidCaissiere = safe_fork();
             if(pidCaissiere){
                 close(c.caissiere_to_main[0]);
