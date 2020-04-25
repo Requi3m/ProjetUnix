@@ -85,19 +85,16 @@ void choix_scenario(int *prixArticle, int *argentCliente, int *stockArticle){
   switch(ans)
     {
     case 1:
-      *prixArticle = 15;
       *argentCliente = 20;
       *stockArticle = 6;
       break;
       
     case 2:
-      *prixArticle = 15;
       *argentCliente = 20;
       *stockArticle = 0;
       break;
       
     case 3:
-      *prixArticle = 15;
       *argentCliente = 10;
       *stockArticle = 6;
       break;
@@ -188,12 +185,29 @@ void echange_argent(char* nom_parle, char* nom_ecoute, int canal_parle[], int ca
 }
 
 void processus_main(struct Canaux* c, char* cliente, char* vendeur, char* caissiere,
-		    int prixArticle, int stockArticle, int argentCliente) {
+		    char *article, int prixArticle, int stockArticle, int argentCliente) {
     char buffer[100];
     char *phrase, *produit, prix[100];
-    sprintf(prix, "%d", prixArticle);
-    int bodyStock = stockArticle, brassiereStock = stockArticle, pyjamaStock = stockArticle;
+    
+    int bodyStock = 7, brassiereStock = 8, pyjamaStock = 15;
+    int bodyPrice = 10, brassierePrice = 15, pyjamaPrice = 8;
 
+    // mise a jour des articles en fonction des arguments du scenario
+    if(strcmp(article, "body") == 0){
+      bodyStock = stockArticle;
+      if(prixArticle > -1)
+	bodyPrice = prixArticle;
+    }
+    else if(strcmp(article, "brassiere") == 0){
+      brassiereStock = stockArticle;
+      if(prixArticle > -1)
+        brassierePrice = prixArticle;
+    }
+    else{
+      pyjamaStock = stockArticle;
+      if(prixArticle > -1)
+	pyjamaPrice = prixArticle;
+    }
     // le vendeur dit bonjour a la cliente
     echange(vendeur, "dit", cliente, (*c).vendeur_to_main,(*c).main_to_cliente);
 
@@ -240,7 +254,13 @@ void processus_main(struct Canaux* c, char* cliente, char* vendeur, char* caissi
 
     // la caissiere cherche le prix du produit
     read((*c).caissiere_to_main[0], buffer, sizeof(buffer));
-    if(strcmp(buffer, "body") == 0){}
+    if(strcmp(buffer, "body") == 0)
+      sprintf(prix, "%d", bodyPrice);
+    else if(strcmp(buffer, "brassiere") == 0)
+      sprintf(prix, "%d", brassierePrice);
+    else
+      sprintf(prix, "%d", pyjamaPrice);
+    
     write((*c).main_to_caissiere[1], prix, strlen(prix) + 1);
 
     // la caissiere annonce le total a payer a la cliente
@@ -265,10 +285,10 @@ void processus_main(struct Canaux* c, char* cliente, char* vendeur, char* caissi
     // la caissiere remet l'article et le ticket de caisse a la cliente, dans un sac
     echange_sac(caissiere, cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
 
-    // la cliente dit merci et au revoir à la caissière
+    // la cliente dit merci et au revoir a la caissière
     echange(cliente, "dit", caissiere, (*c).cliente_to_main, (*c).main_to_caissiere);
 
-    // la caissière dit merci et au revoir à la cliente
+    // la caissiere dit merci et au revoir a la cliente
     echange(caissiere, "dit", cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
 }
 
@@ -451,7 +471,7 @@ int main(int argc, char *argv[]) {
     char vendeur[100];
     char caissiere[100];
     char article[100];
-    int argentCliente, prixArticle, stockArticle;
+    int argentCliente, stockArticle, prixArticle = -1;
 
     if (argc != 1) {
         perror("Erreur, pas d'arguments attendus.\n");
@@ -502,7 +522,8 @@ int main(int argc, char *argv[]) {
 	      close(c.caissiere_to_main[1]);
 	      close(c.main_to_caissiere[0]);
 	      signal(SIGKILL, kill_all);
-	      processus_main(&c, cliente, vendeur, caissiere, prixArticle, stockArticle, argentCliente);
+	      processus_main(&c, cliente, vendeur, caissiere, article,
+			     prixArticle, stockArticle, argentCliente);
             }
         }
     }
