@@ -66,7 +66,7 @@ void choix_scenario(int *prixArticle, int *argentCliente, int *stockArticle){
     printf("Si vous voulez le scenario 'Penurie de guerre', tapez 2.\n");
     printf("Si vous desirez le scenario 'Crise des subprimes', tapez 3.\n");
     printf("Si vous preferez choisir l'argent de la cliente et le prix de l'article, tapez 4.\n");
-    printf("Si vous voulez que le gosse du voisin se taise, tapez le !");
+    printf("Si vous voulez que le gosse du voisin se taise, tapez le !\n\nOption : ");
     char ans;
     int wrongAns = 0;
     do{
@@ -92,12 +92,15 @@ void choix_scenario(int *prixArticle, int *argentCliente, int *stockArticle){
 	  break;
 	  
 	case '4':
-	  printf("\nEntrez l'argent de la cliente (entier attendu) : ");
-	  scanf("%d", argentCliente);
-	  printf("\nEntrez le prix de l'article (entier attendu) : ");
-	  scanf("%d", prixArticle);
-	  printf("\nEntrez le nombre d'articles en stock (entier attendu) : ");
-	  scanf("%d", stockArticle);
+	  do
+	    printf("\nEntrez l'argent de la cliente (entier attendu) : ");
+	  while(scanf("%d", argentCliente) == 0);
+	  do
+	    printf("\nEntrez le prix de l'article (entier attendu) : ");
+	  while(scanf("%d", prixArticle) == 0);
+	  do
+	    printf("\nEntrez le nombre d'articles en stock (entier attendu) : ");
+	  while(scanf("%d", stockArticle));
 	  break;
 	  
 	default:
