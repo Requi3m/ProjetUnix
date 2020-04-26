@@ -168,15 +168,17 @@ void echange_sac(char* nom_parle, char* nom_ecoute, int canal_parle[], int canal
 }
 
 void echange_argent(char* nom_parle, char* nom_ecoute, int canal_parle[], int canal_ecoute[]) {
-    int argent;
-    int len;
     char argentStr[100];
+    int len;
+    int argent;
 
     len = read(canal_parle[0], argentStr, sizeof(argentStr));
     argent = atoi(argentStr);
     printf("%s paye %i euros a %s.\n", nom_parle, argent, nom_ecoute);
     write(canal_ecoute[1], argentStr, len);
 }
+
+
 
 void processus_main(struct Canaux* c, char* cliente, char* vendeur, char* caissiere,
     char *article, int prixArticle, int stockArticle, int argentCliente) {
@@ -186,7 +188,7 @@ void processus_main(struct Canaux* c, char* cliente, char* vendeur, char* caissi
     int bodyStock = 7, brassiereStock = 8, pyjamaStock = 15;
     int bodyPrice = 10, brassierePrice = 15, pyjamaPrice = 8;
 
-// mise a jour des articles en fonction des arguments du scenario
+    // mise a jour des articles en fonction des arguments du scenario
     if (!strcmp(article, "body")) {
         bodyStock = stockArticle;
         if (prixArticle >= 0 )
@@ -203,88 +205,94 @@ void processus_main(struct Canaux* c, char* cliente, char* vendeur, char* caissi
             pyjamaPrice = prixArticle;
     }
 
-// le vendeur dit bonjour a la cliente
+    // le vendeur dit bonjour a la cliente
     echange(vendeur, "dit", cliente, (*c).vendeur_to_main,(*c).main_to_cliente);
 
-// la cliente repond bonjour au vendeur
+    // la cliente repond bonjour au vendeur
     echange(cliente, "dit", vendeur, (*c).cliente_to_main, (*c).main_to_vendeur);
 
-// le vendeur demande a la cliente ce qui lui ferait plaisir
+    // le vendeur demande a la cliente ce qui lui ferait plaisir
     echange(vendeur, "dit", cliente, (*c).vendeur_to_main, (*c).main_to_cliente);
 
-// la cliente dit le nom de l'article
+    // la cliente dit le nom de l'article
     phrase = echange(cliente, "dit", vendeur, (*c).cliente_to_main, (*c).main_to_vendeur);
     produit = phrase + strlen(je_voudrais);
 
-if (stockArticle == 0) { // scenario rupture de stock
-// le vendeur annonce une rupture de stock
-    echange(vendeur, "dit", cliente, (*c).vendeur_to_main, (*c).main_to_cliente);
+    if (stockArticle == 0) { // scenario rupture de stock
+        // le vendeur annonce une rupture de stock
+        echange(vendeur, "dit", cliente, (*c).vendeur_to_main, (*c).main_to_cliente);
 
-// la cliente est desolee et dit au revoir
-    echange(cliente, "dit", vendeur, (*c).cliente_to_main, (*c).main_to_vendeur);
+        // la cliente est desolee et dit au revoir
+        echange(cliente, "dit", vendeur, (*c).cliente_to_main, (*c).main_to_vendeur);
 
-// le vendeur est desole et dit au revoir
-    echange(vendeur, "dit", cliente, (*c).vendeur_to_main, (*c).main_to_cliente);
+        // le vendeur est desole et dit au revoir
+        echange(vendeur, "dit", cliente, (*c).vendeur_to_main, (*c).main_to_cliente);
 
-// fin de la simulation
-    exit(0);
-}
+        // fin de la simulation
+        return;
+    }
 
-// verifier que le stock n'est pas epuise et le mettre a jour
-if (strcmp(produit, "body") == 0) {
-    safe_destock("body", &bodyStock);
-}
-else if(strcmp(produit, "brassiere") == 0){
-    safe_destock("brassiere", &brassiereStock);
-}
-else {
-    safe_destock("pyjama", &pyjamaStock);
-}
+    // verifier que le stock n'est pas epuise et le mettre a jour
+    if (strcmp(produit, "body") == 0) {
+        safe_destock("body", &bodyStock);
+    }
+    else if(strcmp(produit, "brassiere") == 0){
+        safe_destock("brassiere", &brassiereStock);
+    }
+    else {
+        safe_destock("pyjama", &pyjamaStock);
+    }
 
-// le vendeur tend l'article a la cliente
-echange(vendeur, "donne", cliente, (*c).vendeur_to_main, (*c).main_to_cliente);
+    // le vendeur tend l'article a la cliente
+    echange(vendeur, "donne", cliente, (*c).vendeur_to_main, (*c).main_to_cliente);
 
-// la cliente tend l'article a la caissiere
-echange(cliente, "donne", caissiere, (*c).cliente_to_main, (*c).main_to_caissiere);
+    // la cliente tend l'article a la caissiere
+    echange(cliente, "donne", caissiere, (*c).cliente_to_main, (*c).main_to_caissiere);
 
-// la caissiere cherche le prix du produit
-read((*c).caissiere_to_main[0], buffer, sizeof(buffer));
-if(strcmp(buffer, "body") == 0)
-    sprintf(prix, "%d", bodyPrice);
-else if(strcmp(buffer, "brassiere") == 0)
-    sprintf(prix, "%d", brassierePrice);
-else
-    sprintf(prix, "%d", pyjamaPrice);
+    // la caissiere cherche le prix du produit
+    read((*c).caissiere_to_main[0], buffer, sizeof(buffer));
+    if (!strcmp(buffer, "body")) {
+        prixArticle = bodyPrice;
+        sprintf(prix, "%d", bodyPrice);
+    }
+    else if (!strcmp(buffer, "brassiere")) {
+        prixArticle = brassierePrice;
+        sprintf(prix, "%d", brassierePrice);
+    }
+    else {
+        prixArticle = pyjamaPrice;
+        sprintf(prix, "%d", pyjamaPrice);
+    }
+    write((*c).main_to_caissiere[1], prix, strlen(prix) + 1);
 
-write((*c).main_to_caissiere[1], prix, strlen(prix) + 1);
+    // la caissiere annonce le total a payer a la cliente
+    echange(caissiere, "dit" , cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
 
-// la caissiere annonce le total a payer a la cliente
-echange(caissiere, "dit" , cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
+    if (argentCliente < prixArticle) { // scenario crise economique
+        // la cliente n'a pas assez d'argent
+        echange(cliente, "dit", caissiere, (*c).cliente_to_main, (*c).main_to_caissiere);
 
-if (argentCliente < prixArticle) { // scenario crise economique
-// la cliente n'a pas assez d'argent
+        // la caissiere est desolee et dit au revoir
+        echange(caissiere, "dit" ,cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
+
+        // la cliente est desolee et dit au revoir
+        echange(cliente, "dit", caissiere, (*c).cliente_to_main, (*c).main_to_caissiere);
+
+        // fin de la simulation
+        return;
+    }
+
+    // la cliente paie a la caissiere
+    echange_argent(cliente, caissiere, (*c).cliente_to_main, (*c).main_to_caissiere);
+
+    // la caissiere remet l'article et le ticket de caisse a la cliente, dans un sac
+    echange_sac(caissiere, cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
+
+    // la cliente dit merci et au revoir a la caissière
     echange(cliente, "dit", caissiere, (*c).cliente_to_main, (*c).main_to_caissiere);
 
-// la caissiere est desolee et dit au revoir
-    echange(caissiere, "dit" ,cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
-
-// la cliente est desolee et dit au revoir
-    echange(cliente, "dit", caissiere, (*c).cliente_to_main, (*c).main_to_caissiere);
-
-// fin de la simulation
-    exit(0);
-}
-// la cliente paie a la caissiere
-echange_argent(cliente, caissiere, (*c).cliente_to_main, (*c).main_to_caissiere);
-
-// la caissiere remet l'article et le ticket de caisse a la cliente, dans un sac
-echange_sac(caissiere, cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
-
-// la cliente dit merci et au revoir a la caissière
-echange(cliente, "dit", caissiere, (*c).cliente_to_main, (*c).main_to_caissiere);
-
-// la caissiere dit merci et au revoir a la cliente
-echange(caissiere, "dit", cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
+    // la caissiere dit merci et au revoir a la cliente
+    echange(caissiere, "dit", cliente, (*c).caissiere_to_main, (*c).main_to_cliente);
 }
 
 
@@ -293,34 +301,35 @@ void processus_vendeur(struct Canaux* c, int stockArticle) {
     char phrase[100];
     char *produit;
 
-// le vendeur dit bonjour a la cliente
+    // le vendeur dit bonjour a la cliente
     write((*c).vendeur_to_main[1], bonjour, strlen(bonjour) + 1);
 
-// la cliente repond bonjour au vendeur
+    // la cliente repond bonjour au vendeur
     read((*c).main_to_vendeur[0], buffer, sizeof(buffer));
 
-// le vendeur demande a la cliente ce qui lui ferait plaisir
+    // le vendeur demande a la cliente ce qui lui ferait plaisir
     write((*c).vendeur_to_main[1], tu_veux_quoi, strlen(tu_veux_quoi) + 1);
 
-// la cliente dit le nom de l'article
+    // la cliente dit le nom de l'article
     read((*c).main_to_vendeur[0], phrase, sizeof(phrase));
     produit = phrase + strlen(je_voudrais);
 
-if (stockArticle == 0) { // scenario rupture de stock
-// le vendeur annonce une rupture de stock
-    sprintf(buffer, "%s%s. \nRevenez une prochaine fois.", rupture_stock, produit);
-    write((*c).vendeur_to_main[1], buffer, strlen(buffer) + 1);
+    if (stockArticle == 0) { // scenario rupture de stock
+        // le vendeur annonce une rupture de stock
+        sprintf(buffer, "%s%s. Revenez une prochaine fois.", rupture_stock, produit);
+        write((*c).vendeur_to_main[1], buffer, strlen(buffer) + 1);
 
-// la cliente est desolee et dit au revoir
-    read((*c).main_to_vendeur[0], buffer, sizeof(buffer));
+        // la cliente est desolee et dit au revoir
+        read((*c).main_to_vendeur[0], buffer, sizeof(buffer));
 
-// le vendeur est desole et dit au revoir
-    write((*c).vendeur_to_main[1], dommage, strlen(dommage) + 1);
+        // le vendeur est desole et dit au revoir
+        write((*c).vendeur_to_main[1], dommage, strlen(dommage) + 1);
 
-    return;
-}
-// le vendeur tend l'article à la cliente
-write((*c).vendeur_to_main[1], produit, strlen(produit) + 1);
+        return;
+    }
+
+    // le vendeur tend l'article à la cliente
+    write((*c).vendeur_to_main[1], produit, strlen(produit) + 1);
 }
 
 
@@ -331,73 +340,68 @@ void processus_cliente(struct Canaux* c, char* article, int *argentCliente) {
     int argentToPay;
     struct Sac sac;
 
-// le vendeur dit bonjour à la cliente
+    // le vendeur dit bonjour à la cliente
     read((*c).main_to_cliente[0], buffer, sizeof(buffer));
 
-// la cliente repond bonjour au vendeur
+    // la cliente repond bonjour au vendeur
     write((*c).cliente_to_main[1], bonjour, strlen(bonjour) + 1);
 
-// le vendeur demande a la cliente ce qui lui ferait plaisir
+    // le vendeur demande a la cliente ce qui lui ferait plaisir
     read((*c).main_to_cliente[0], buffer, sizeof(buffer));
 
-// la cliente dit le nom de l'article
+    // la cliente dit le nom de l'article
     sprintf(buffer, "%s%s", je_voudrais, article);
     write((*c).cliente_to_main[1], buffer, strlen(buffer) + 1);
 
-// le vendeur lui repond
+    // le vendeur lui repond
     read((*c).main_to_cliente[0], produit, sizeof(produit));
 
-if (strstr(produit, "rupture") != NULL) { // scenario rupture de stock
+    if (strstr(produit, "rupture") != NULL) { // scenario rupture de stock
+        // la cliente est desolee et dit au revoir
+        write((*c).cliente_to_main[1], dommage, strlen(dommage) + 1);
 
-// la cliente est desolee et dit au revoir
-    write((*c).cliente_to_main[1], dommage, strlen(dommage) + 1);
+        // le vendeur est desole et dit au revoir
+        read((*c).main_to_cliente[0], buffer, sizeof(buffer));
 
-// le vendeur est desole et dit au revoir
+        return;
+    }
+    // sinon le vendeur a tendu l'article a la cliente
+
+    // la cliente tend l'article a la caissiere
+    write((*c).cliente_to_main[1], produit, strlen(produit) + 1);
+
+    // la caissiere annonce le total a payer a la cliente
+    read((*c).main_to_cliente[0], prix, sizeof(prix));
+
+    argentToPay = atoi(prix);
+
+    if (*argentCliente < argentToPay) { // scenario crise economique
+        // la cliente n'a pas assez d'argent
+        write((*c).cliente_to_main[1], trop_cher, strlen(trop_cher) + 1);
+
+        // la caissiere est desolee et dit au revoir
+        read((*c).main_to_cliente[0], buffer, sizeof(buffer));
+
+        // la cliente est desolee et dit au revoir
+        write((*c).cliente_to_main[1], dommage, strlen(dommage) + 1);
+
+        return;
+    }
+
+    // la cliente paie a la caissiere
+    sprintf(prix, "%d", argentToPay);
+
+    *argentCliente = *argentCliente - argentToPay;
+    write((*c).cliente_to_main[1], prix, strlen(prix) + 1);
+
+    // la caissiere remet l'article et le ticket de caisse a la cliente, dans un sac
+    read((*c).main_to_cliente[0], &sac, sizeof(sac));
+
+    // la cliente dit merci et au revoir a la caissiere
+    write((*c).cliente_to_main[1], merci, strlen(merci) + 1);
+
+    // la caissiere dit merci et au revoir a la cliente
     read((*c).main_to_cliente[0], buffer, sizeof(buffer));
-
-    return;
-}
-// le vendeur tend l'article a la cliente
-
-// check que produit == article
-
-// la cliente tend l'article a la caissiere
-write((*c).cliente_to_main[1], produit, strlen(produit) + 1);
-
-// la caissiere annonce le total a payer a la cliente
-read((*c).main_to_cliente[0], prix, sizeof(prix));
-
-argentToPay = atoi(prix);
-
-if (*argentCliente < argentToPay) { // scenario crise economique
-// la cliente n'a pas assez d'argent
-    write((*c).cliente_to_main[1], trop_cher, strlen(trop_cher) + 1);
-
-// la caissiere est desolee et dit au revoir
-    read((*c).main_to_cliente[0], buffer, sizeof(buffer));
-
-// la cliente est desolee et dit au revoir
-    write((*c).cliente_to_main[1], dommage, strlen(dommage) + 1);
-
-    return;
-}
-
-// la cliente paie a la caissiere
-*argentCliente = *argentCliente - argentToPay;
-
-char prixStr[100];
-sprintf(prixStr, "%d", argentToPay);
-
-write((*c).cliente_to_main[1], prixStr, sizeof(prixStr));
-
-// la caissiere remet l'article et le ticket de caisse a la cliente, dans un sac
-read((*c).main_to_cliente[0], &sac, sizeof(sac));
-
-// la cliente dit merci et au revoir a la caissiere
-write((*c).cliente_to_main[1], merci, strlen(merci) + 1);
-
-// la caissiere dit merci et au revoir a la cliente
-read((*c).main_to_cliente[0], buffer, sizeof(buffer));
 }
 
 
@@ -412,51 +416,48 @@ void processus_caissiere(struct Canaux* c, int stockArticle) {
     if (stockArticle == 0) {
         return;
     }
-// la cliente tend l'article a la caissiere
+
+    // la cliente tend l'article a la caissiere
     len = read((*c).main_to_caissiere[0], produit, sizeof(produit));
 
-// la caissiere douche l'article (cherche le prix de l'article)
+    // la caissiere douche l'article (cherche le prix de l'article)
     write((*c).caissiere_to_main[1], produit, len);
     len = read((*c).main_to_caissiere[0], prix, sizeof(prix));
 
-// la caissiere annonce le total a payer a la cliente
-    char prixToPay[150];
-    strcpy(prixToPay, prix);
-    sprintf(prixToPay, "%s euros s'il vous plait.", prix);
-    write((*c).caissiere_to_main[1], prixToPay, strlen(prixToPay)+1);
+    // la caissiere annonce le total a payer a la cliente
+    sprintf(prix, "%s euros s'il-vous-plaît.", prix);
+    write((*c).caissiere_to_main[1], prix, strlen(prix) + 1);
 
-// reponse de la cliente
+    // reponse de la cliente
     read((*c).main_to_caissiere[0], buffer, sizeof(buffer));
 
-if (strstr(buffer, "pas assez d'argent") != NULL) { // scenario crise economique
-// la cliente n'a pas assez d'argent
+    if (strstr(buffer, "pas assez d'argent") != NULL) { // scenario crise economique
+        // la cliente n'a pas assez d'argent
 
-// la caissiere est desolee et dit au revoir
-    write((*c).caissiere_to_main[1], dommage, strlen(dommage) + 1);
+        // la caissiere est desolee et dit au revoir
+        write((*c).caissiere_to_main[1], dommage, strlen(dommage) + 1);
 
-// la cliente est desolee et dit au revoir
+        // la cliente est desolee et dit au revoir
+        read((*c).main_to_caissiere[0], buffer, sizeof(buffer));
+
+        return;
+    }
+
+    // la cliente paie a la caissiere
+    argent = atoi(buffer);
+
+    // la caissiere prepare le sac
+    sac.montant_ticket = argent;
+    strcpy(sac.produit, produit);
+
+    // la caissiere remet le sac a la cliente
+    write((*c).caissiere_to_main[1], &sac, sizeof(sac));
+
+    // la cliente dit merci et au revoir a la caissiere
     read((*c).main_to_caissiere[0], buffer, sizeof(buffer));
 
-    return;
-}
-
-// la cliente paie a la caissiere
-
-argent = atoi(buffer);
-
-// check bonne somme
-
-// la caissiere remet l'article et le ticket de caisse a la cliente, dans un sac
-sac.montant_ticket = argent;
-strcpy(sac.produit, produit);
-write((*c).caissiere_to_main[1], &sac, sizeof(sac));
-
-// la cliente dit merci et au revoir a la caissiere
-read((*c).main_to_caissiere[0], buffer, sizeof(buffer));
-
-// la caissiere dit merci et au revoir a la cliente
-write((*c).caissiere_to_main[1], merci, strlen(merci) + 1);
-
+    // la caissiere dit merci et au revoir a la cliente
+    write((*c).caissiere_to_main[1], merci, strlen(merci) + 1);
 }
 
 
